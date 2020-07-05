@@ -13,18 +13,46 @@ static pid_t pids[NR_FORKS];
 
 static void *fork_loop(void *data)
 {
+	int policy, ret, i = 0;
+	pthread_attr_t attr;
 	pid_t pid;
-	int i = 0;
+
+	ret = pthread_attr_init(&attr);
+	if (ret) {
+		perror("Failed to init pthread_attr_t");
+		return NULL;
+	}
 
 	while (nr_forks--) {
 		pid = fork();
 		if (!pid)
-			break;
+			goto child;
 		if (pid == -1) {
 			perror("Failed to create a child process");
 			return NULL;
 		}
 		pids[i++] = pid;
+	}
+
+	return NULL;
+child:
+	pid = getpid();
+
+	ret = pthread_attr_getschedpolicy(&attr, &policy);
+	if (ret) {
+		perror("Failed to get policy");
+	} else {
+		char *str;
+
+		switch (policy) {
+			case SCHED_OTHER:
+				str = "SCHED_NORMAL";
+				break;
+			case SCHED_FIFO:
+				str = "SCHED_NORMAL";
+				break;
+		}
+		printf("Created %d, policy: %s\n", pid, str);
 	}
 
 	return NULL;
@@ -37,12 +65,6 @@ static void *test_loop(void *data)
 
 static int verify(void)
 {
-	int i;
-
-	for (i = 0; i < NR_FORKS; i++) {
-		printf("Created: %d\n", pids[i]);
-	}
-
 	printf("All forked RT tasks had the correct uclamp.min\n");
 	return EXIT_SUCCESS;
 }
