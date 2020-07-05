@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 
 	ret = pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
 	if (ret) {
-		perror("Failed to init pthread_attr_t");
+		perror("Failed to set policy to SCHED_FIFO");
 		return EXIT_FAILURE;
 	}
 
