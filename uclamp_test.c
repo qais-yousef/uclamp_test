@@ -26,14 +26,23 @@ static void *fork_loop(void *data)
 		}
 		pids[i++] = pid;
 	}
+
+	return NULL;
 }
 
 static void *test_loop(void *data)
 {
+	return NULL;
 }
 
 static int verify(void)
 {
+	int i;
+
+	for (i = 0; i < NR_FORKS; i++) {
+		printf("Created: %d\n", pids[i]);
+	}
+
 	printf("All forked RT tasks had the correct uclamp.min\n");
 	return EXIT_SUCCESS;
 }
@@ -68,10 +77,8 @@ int main(char **argv, int argc)
 		return EXIT_FAILURE;
 	}
 
-	ret = verify();
-
 	pthread_join(fork_thread, NULL);
 	pthread_join(test_thread, NULL);
 
-	return ret;
+	return verify();
 }
