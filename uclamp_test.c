@@ -104,15 +104,6 @@ child:
 	return NULL;
 }
 
-static void *test_loop(void *data)
-{
-	while (nr_forks > 0) {
-		usleep(1 * 1000);
-		write_rt_min(++test_rt_min);
-	}
-	return NULL;
-}
-
 static void verify_pid(pid_t pid)
 {
 	struct sched_attr sched_attr;
@@ -148,37 +139,45 @@ static int verify(void)
 		 * We carry on anyway to cleanup and not end up with zombie
 		 * tasks.
 		 */
-		if (pids[i] != 0)
-			verify_pid(pids[i]);
-		else
-			printf("Some pids weren't created correctly..\n");
+		if (!pids[i])
+			break;
+
+		verify_pid(pids[i]);
 
 		//pr_debug("%d policy = %d\n",
 		//	 pids[i], sched_getscheduler(pids[i]));
-
-		/*
-		 * Because of fork() parent and child don't see the same
-		 * conditional variable, so we can't just signal them to
-		 * wakeup.
-		 *
-		 * Since this is just a test, go brute force and just send
-		 * SIGKILL.
-		 */
-		kill(pids[i], SIGKILL);
 	}
 
-	write_rt_min(orig_rt_min);
+	return EXIT_SUCCESS;
+}
+
+static void *test_loop(void *data)
+{
+	int ret;
+
+	orig_rt_min = read_rt_min();
+
+	while (nr_forks > 0) {
+		if (test_rt_min > 1024)
+			test_rt_min = 0;
+
+		write_rt_min(++test_rt_min);
+		ret = verify();
+		if (ret)
+			goto out;
+	}
 
 	printf("All forked RT tasks had the correct uclamp.min\n");
-	return EXIT_SUCCESS;
+
+out:
+	write_rt_min(orig_rt_min);
+	return NULL;
 }
 
 int main(int argc, char **argv)
 {
 	pthread_t fork_thread, test_thread;
-	int ret;
-
-	orig_rt_min = read_rt_min();
+	int ret, i;
 
 	ret = pthread_create(&fork_thread, NULL, fork_loop, NULL);
 	if (ret) {
@@ -195,5 +194,22 @@ int main(int argc, char **argv)
 	pthread_join(fork_thread, NULL);
 	pthread_join(test_thread, NULL);
 
-	return verify();
+
+	for (i = 0; i < NR_FORKS; i++) {
+
+		if (!pids[i])
+			continue;
+
+		/*
+		 * Because of fork() parent and child don't see the same
+		 * conditional variable, so we can't just signal them to
+		 * wakeup.
+		 *
+		 * Since this is just a test, go brute force and just send
+		 * SIGKILL.
+		 */
+		kill(pids[i], SIGKILL);
+	}
+
+	return EXIT_SUCCESS;
 }
