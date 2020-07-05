@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 
 #include <pthread.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -10,6 +12,16 @@
 
 static int nr_forks = NR_FORKS;
 static pid_t pids[NR_FORKS];
+
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+//#define DEBUG
+#ifdef DEBUG
+#define pr_debug	printf
+#else
+#define pr_debug(...)
+#endif
 
 static void *fork_loop(void *data)
 {
@@ -42,7 +54,9 @@ static void *fork_loop(void *data)
 
 	return NULL;
 child:
-	/* FIXME: add wait signal logic */
+	pthread_mutex_lock(&mutex);
+	pthread_cond_wait(&cond, &mutex);
+	pthread_mutex_unlock(&mutex);
 
 	return NULL;
 }
@@ -68,7 +82,18 @@ static int verify(void)
 
 		/* FIXME: verify uclamp.min for every task is what we expect */
 
-		//printf("%d policy = %d\n", pids[i], sched_getscheduler(pids[i]));
+		pr_debug("%d policy = %d\n",
+			 pids[i], sched_getscheduler(pids[i]));
+
+		/*
+		 * Because of fork() parent and child don't see the same
+		 * conditional variable, so we can't just signal them to
+		 * wakeup.
+		 *
+		 * Since this is just a test, go brute force and just send
+		 * SIGKILL.
+		 */
+		kill(pids[i], SIGKILL);
 	}
 
 	printf("All forked RT tasks had the correct uclamp.min\n");
