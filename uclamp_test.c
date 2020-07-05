@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+#include "sched.h"
 
 #include <pthread.h>
 #include <signal.h>
@@ -26,6 +27,7 @@ static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 #define PROCFS_RT_MIN	"/proc/sys/kernel/sched_util_clamp_min_rt_default"
 static int orig_rt_min;
+static int test_rt_min = 333;
 
 static int read_rt_min(void)
 {
@@ -104,9 +106,29 @@ static void *test_loop(void *data)
 {
 	while (nr_forks > 0) {
 		sleep(1);
-		write_rt_min(300);
+		write_rt_min(test_rt_min);
 	}
 	return NULL;
+}
+
+static void verify_pid(pid_t pid)
+{
+	struct sched_attr sched_attr;
+	int ret;
+
+	ret = sched_getattr(pid, &sched_attr, sizeof(struct sched_attr), 0);
+	if (ret) {
+		perror("Failed to get attr");
+		printf("Couldn't get schedattr for pid %d\n", pid);
+		return;
+	}
+
+	if (sched_attr.sched_util_min != test_rt_min)
+		printf("pid %d has %d but default should be %d\n",
+			pid, sched_attr.sched_util_min, test_rt_min);
+
+	pr_debug("pid %d has %d, default is %d\n",
+		pid, sched_attr.sched_util_min, test_rt_min);
 }
 
 static int verify(void)
@@ -118,11 +140,16 @@ static int verify(void)
 
 	for (i = 0; i < NR_FORKS; i++) {
 
-		/* If a pid is 0, it means we got an error */
-		if (pids[i] == 0)
-			return EXIT_FAILURE;
-
-		/* FIXME: verify uclamp.min for every task is what we expect */
+		/*
+		 * If a pid is 0, it means we got an error.
+		 *
+		 * We carry on anyway to cleanup and not end up with zombie
+		 * tasks.
+		 */
+		if (pids[i] != 0)
+			verify_pid(pids[i]);
+		else
+			printf("Some pids weren't created correctly..\n");
 
 		//pr_debug("%d policy = %d\n",
 		//	 pids[i], sched_getscheduler(pids[i]));
