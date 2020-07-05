@@ -3,9 +3,29 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#define NR_FORKS	100
+
+static int nr_forks = NR_FORKS;
+static pid_t pids[NR_FORKS];
 
 static void *fork_loop(void *data)
 {
+	pid_t pid;
+	int i = 0;
+
+	while (nr_forks--) {
+		pid = fork();
+		if (!pid)
+			break;
+		if (pid == -1) {
+			perror("Failed to create a child process");
+			return NULL;
+		}
+		pids[i++] = pid;
+	}
 }
 
 static void *test_loop(void *data)
