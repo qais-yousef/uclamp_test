@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -22,6 +23,44 @@ static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 #else
 #define pr_debug(...)
 #endif
+
+#define PROCFS_RT_MIN	"/proc/sys/kernel/sched_util_clamp_min_rt_default"
+static int orig_rt_min;
+
+static int read_rt_min(void)
+{
+	char str[16] = {};
+
+	FILE *fp = fopen(PROCFS_RT_MIN, "r");
+	if (!fp) {
+		perror("Can't open procfs");
+		return -1;
+	}
+
+	fread(str, 1, 16, fp);
+	fclose(fp);
+
+	pr_debug("read_rt_min = %s\n", str);
+
+	return atoi(str);
+}
+
+static void write_rt_min(int value)
+{
+	char str[16] = {};
+
+	FILE *fp = fopen(PROCFS_RT_MIN, "w");
+	if (!fp) {
+		perror("Can't open procfs");
+		return;
+	}
+
+	snprintf(str, 16, "%d", value);
+	fwrite(str, 1, strlen(str), fp);
+	fclose(fp);
+
+	pr_debug("write_rt_min = %s\n", str);
+}
 
 static void *fork_loop(void *data)
 {
@@ -63,7 +102,10 @@ child:
 
 static void *test_loop(void *data)
 {
-	/* FIXME: change /proc/sys/kernel/sched_uclamp_util_min_rt_default */
+	while (nr_forks > 0) {
+		sleep(1);
+		write_rt_min(300);
+	}
 	return NULL;
 }
 
@@ -82,8 +124,8 @@ static int verify(void)
 
 		/* FIXME: verify uclamp.min for every task is what we expect */
 
-		pr_debug("%d policy = %d\n",
-			 pids[i], sched_getscheduler(pids[i]));
+		//pr_debug("%d policy = %d\n",
+		//	 pids[i], sched_getscheduler(pids[i]));
 
 		/*
 		 * Because of fork() parent and child don't see the same
@@ -96,6 +138,8 @@ static int verify(void)
 		kill(pids[i], SIGKILL);
 	}
 
+	write_rt_min(orig_rt_min);
+
 	printf("All forked RT tasks had the correct uclamp.min\n");
 	return EXIT_SUCCESS;
 }
@@ -104,6 +148,8 @@ int main(int argc, char **argv)
 {
 	pthread_t fork_thread, test_thread;
 	int ret;
+
+	orig_rt_min = read_rt_min();
 
 	ret = pthread_create(&fork_thread, NULL, fork_loop, NULL);
 	if (ret) {
