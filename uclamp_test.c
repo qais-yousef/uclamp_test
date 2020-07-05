@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define NR_FORKS	100
+#define NR_FORKS	10000
 
 static int nr_forks = NR_FORKS;
 static pid_t pids[NR_FORKS];
@@ -105,8 +105,8 @@ child:
 static void *test_loop(void *data)
 {
 	while (nr_forks > 0) {
-		sleep(1);
-		write_rt_min(test_rt_min);
+		//sleep(1);
+		write_rt_min(++test_rt_min);
 	}
 	return NULL;
 }
