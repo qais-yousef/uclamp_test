@@ -13,16 +13,22 @@ static pid_t pids[NR_FORKS];
 
 static void *fork_loop(void *data)
 {
-	int policy, ret, i = 0;
-	pthread_attr_t attr;
+	struct sched_param param;
+	int ret, i = 0;
 	pid_t pid;
 
-	ret = pthread_attr_init(&attr);
+	/* Set to SCHED_FIFO before we start */
+	param.sched_priority = 33;
+	ret = sched_setscheduler(0, SCHED_FIFO, &param);
 	if (ret) {
-		perror("Failed to init pthread_attr_t");
+		perror("Failed to set policy to SCHED_FIFO");
 		return NULL;
 	}
 
+	/*
+	 * fork() the specified number of threads saving the resulting pid in
+	 * pids[] array. Child process will then wait for a signal to exit.
+	 */
 	while (nr_forks--) {
 		pid = fork();
 		if (!pid)
@@ -36,35 +42,35 @@ static void *fork_loop(void *data)
 
 	return NULL;
 child:
-	pid = getpid();
-
-	ret = pthread_attr_getschedpolicy(&attr, &policy);
-	if (ret) {
-		perror("Failed to get policy");
-	} else {
-		char *str;
-
-		switch (policy) {
-			case SCHED_OTHER:
-				str = "SCHED_NORMAL";
-				break;
-			case SCHED_FIFO:
-				str = "SCHED_NORMAL";
-				break;
-		}
-		printf("Created %d, policy: %s\n", pid, str);
-	}
+	/* FIXME: add wait signal logic */
 
 	return NULL;
 }
 
 static void *test_loop(void *data)
 {
+	/* FIXME: change /proc/sys/kernel/sched_uclamp_util_min_rt_default */
 	return NULL;
 }
 
 static int verify(void)
 {
+	int i;
+
+	/* flush any messages we printed into stdout */
+	fflush(stdout);
+
+	for (i = 0; i < NR_FORKS; i++) {
+
+		/* If a pid is 0, it means we got an error */
+		if (pids[i] == 0)
+			return EXIT_FAILURE;
+
+		/* FIXME: verify uclamp.min for every task is what we expect */
+
+		//printf("%d policy = %d\n", pids[i], sched_getscheduler(pids[i]));
+	}
+
 	printf("All forked RT tasks had the correct uclamp.min\n");
 	return EXIT_SUCCESS;
 }
@@ -72,22 +78,9 @@ static int verify(void)
 int main(int argc, char **argv)
 {
 	pthread_t fork_thread, test_thread;
-	pthread_attr_t attr;
 	int ret;
 
-	ret = pthread_attr_init(&attr);
-	if (ret) {
-		perror("Failed to init pthread_attr_t");
-		return EXIT_FAILURE;
-	}
-
-	ret = pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
-	if (ret) {
-		perror("Failed to set policy to SCHED_FIFO");
-		return EXIT_FAILURE;
-	}
-
-	ret = pthread_create(&fork_thread, &attr, fork_loop, NULL);
+	ret = pthread_create(&fork_thread, NULL, fork_loop, NULL);
 	if (ret) {
 		perror("Failed to create fork thread");
 		return EXIT_FAILURE;
