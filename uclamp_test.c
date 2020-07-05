@@ -47,7 +47,7 @@ static int verify(void)
 	return EXIT_SUCCESS;
 }
 
-int main(char **argv, int argc)
+int main(int argc, char **argv)
 {
 	pthread_t fork_thread, test_thread;
 	pthread_attr_t attr;

@@ -2,7 +2,7 @@ APP=uclamp_test
 
 SRC=$(wildcard *.c)
 
-CFLAGS=-Werror -g
+CFLAGS=-Werror -Wall -g
 LIBS=-lpthread
 
 $(APP): $(SRC)
