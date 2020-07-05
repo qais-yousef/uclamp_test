@@ -91,6 +91,8 @@ static void *fork_loop(void *data)
 			return NULL;
 		}
 		pids[i++] = pid;
+
+		usleep(500);
 	}
 
 	return NULL;
@@ -105,7 +107,7 @@ child:
 static void *test_loop(void *data)
 {
 	while (nr_forks > 0) {
-		//sleep(1);
+		usleep(1 * 1000);
 		write_rt_min(++test_rt_min);
 	}
 	return NULL;
