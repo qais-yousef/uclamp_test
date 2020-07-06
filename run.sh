@@ -1,10 +1,18 @@
 #!/bin/sh
 set -eu
 
-make > /dev/null
+SUDO=""
+
+if [ -n "$(which make)" ]; then
+	make > /dev/null
+fi
+
+if [ -n "$(which sudo)" ]; then
+	SUDO=sudo
+fi
 
 ITERATIONS=${1:-10}
 for i in $(seq $ITERATIONS);
 do
-	sudo ./uclamp_test
+	$SUDO ./uclamp_test
 done
