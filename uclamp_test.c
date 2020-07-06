@@ -104,7 +104,7 @@ child:
 	return NULL;
 }
 
-static void verify_pid(pid_t pid)
+static int verify_pid(pid_t pid)
 {
 	struct sched_attr sched_attr;
 	int ret;
@@ -113,20 +113,25 @@ static void verify_pid(pid_t pid)
 	if (ret) {
 		perror("Failed to get attr");
 		printf("Couldn't get schedattr for pid %d\n", pid);
-		return;
+		return -1;
 	}
 
-	if (sched_attr.sched_util_min != test_rt_min)
+	if (sched_attr.sched_util_min != test_rt_min) {
 		printf("pid %d has %d but default should be %d\n",
 			pid, sched_attr.sched_util_min, test_rt_min);
 
+		return -1;
+	}
+
 	pr_debug("pid %d has %d, default is %d\n",
 		pid, sched_attr.sched_util_min, test_rt_min);
+
+	return 0;
 }
 
 static int verify(void)
 {
-	int i;
+	int i, ret;
 
 	/* flush any messages we printed into stdout */
 	fflush(stdout);
@@ -142,13 +147,15 @@ static int verify(void)
 		if (!pids[i])
 			break;
 
-		verify_pid(pids[i]);
+		ret = verify_pid(pids[i]);
+		if (ret)
+			return ret;
 
 		//pr_debug("%d policy = %d\n",
 		//	 pids[i], sched_getscheduler(pids[i]));
 	}
 
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 static void *test_loop(void *data)
