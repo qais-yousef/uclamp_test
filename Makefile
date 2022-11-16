@@ -1,14 +1,12 @@
-APP=uclamp_test
-
-SRC=$(wildcard *.c)
+TESTS=$(basename $(wildcard *.c))
 
 CFLAGS=-Werror -Wall -g
 LIBS=-lpthread
 
-$(APP): $(SRC)
-	$(CC) $(CFLAGS) -o $(APP) $(SRC) $(LIBS)
+%: %.c
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
 
-all: $(APP)
+all: $(TESTS)
 
 clean:
-	rm -f *.o $(APP)
+	rm -f *.o $(TESTS)
