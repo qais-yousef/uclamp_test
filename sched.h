@@ -1,5 +1,21 @@
 /*
- * Taken from rt-app/libdl/dl_syscall.[ch]
+ * Based on:
+ *
+ *	https://github.com/scheduler-tools/rt-app/blob/master/libdl/dl_syscalls.h
+ *	https://github.com/scheduler-tools/rt-app/blob/master/libdl/dl_syscalls.c
+ *
+ * Libdl
+ *  (C) Dario Faggioli <raistlin@linux.it>, 2009, 2010
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License (COPYING file) for more details.
+ *
  */
 
 #ifndef __SCHED_H__
