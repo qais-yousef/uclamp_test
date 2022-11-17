@@ -1,7 +1,7 @@
 TESTS=$(basename $(filter-out $(wildcard *.bpf.c), $(wildcard *.c)))
 BPF_SKEL=$(subst .bpf.c,.skel.h, $(wildcard *.bpf.c))
 
-CFLAGS=-O2 -Werror -Wall -g
+CFLAGS=-O2 -Wall -g
 INCLUDE=-I bpf/usr/include
 LIBS=-lpthread bpf/usr/lib64/libbpf.a -lelf -lz
 
