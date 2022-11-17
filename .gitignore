@@ -1,2 +1,6 @@
 uclamp_test_rt_default
 uclamp_test_thermal_pressure
+bpf/
+*.o
+vmlinux.h
+*.skel.h
