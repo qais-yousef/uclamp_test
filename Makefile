@@ -7,18 +7,9 @@ LIBS=-lpthread bpf/usr/lib64/libbpf.a -lelf -lz -static
 
 ARCH ?= arm64
 
-%.bpf.o: %.bpf.c
-	clang $(CFLAGS) -target bpf -D__TARGET_ARCH_$(ARCH) $(INCLUDE) -c $< -o $@
-	llvm-strip -g $@
+all: bpf $(BPF_SKEL) $(TESTS)
 
-%.skel.h: %.bpf.o
-	bpftool gen skeleton $< > $@
-
-%: %.c
-	$(CC) $(CFLAGS) $(INCLUDE) -c $@.c -o $@.o
-	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $@.o $(LIBS)
-
-all:
+bpf: libbpf
 	git submodule init
 	git submodule update
 
@@ -26,8 +17,20 @@ all:
 
 	bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
 
-	make $(BPF_SKEL)
-	make $(TESTS)
+%.bpf.o: %.bpf.c
+	clang $(CFLAGS) -target bpf -D__TARGET_ARCH_$(ARCH) $(INCLUDE) -c $< -o $@
+	llvm-strip -g $@
+
+%.skel.h: %.bpf.o
+	bpftool gen skeleton $< > $@
+
+%: %.c %.skel.h
+	$(CC) $(CFLAGS) $(INCLUDE) -c $@.c -o $@.o
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $@.o $(LIBS)
+
+%: %.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c $@.c -o $@.o
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $@.o $(LIBS)
 
 clean:
 	rm -f *.o $(TESTS)
