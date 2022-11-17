@@ -1,6 +1,6 @@
 TESTS=$(basename $(wildcard *.c))
 
-CFLAGS=-Werror -Wall -g
+CFLAGS=-O2 -Werror -Wall -g
 INCLUDE=-I bpf/usr/include
 LIBS=-lpthread bpf/usr/lib64/libbpf.a -lelf -lz
 

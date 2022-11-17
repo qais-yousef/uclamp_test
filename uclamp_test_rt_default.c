@@ -32,6 +32,7 @@ static int test_rt_min = 333;
 static int read_rt_min(void)
 {
 	char str[16] = {};
+	int read;
 
 	FILE *fp = fopen(PROCFS_RT_MIN, "r");
 	if (!fp) {
@@ -39,8 +40,10 @@ static int read_rt_min(void)
 		return -1;
 	}
 
-	fread(str, 1, 16, fp);
+	read = fread(str, 1, 16, fp);
 	fclose(fp);
+	if (!read)
+		return -1;
 
 	pr_debug("read_rt_min = %s\n", str);
 
