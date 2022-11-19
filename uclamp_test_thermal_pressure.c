@@ -24,10 +24,18 @@
 #endif
 
 
-#define NR_LOOPS	100000
+#define NR_LOOPS	1000000
 
 static bool volatile start = false;
 static bool volatile done = false;
+
+struct capacities {
+	unsigned long *cap;
+	unsigned int len;
+} capacities;
+
+#define for_each_capacity(cap, i)	\
+	for ((i) = 0, (cap) = capacities.cap[(i)]; (i) < capacities.len; (i)+=1, (cap) = capacities.cap[(i)])
 
 
 static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
@@ -48,6 +56,39 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	return 0;
 }
 
+#define SYSFS_CAPACITIES	"/sys/devices/system/cpu/cpu*/cpu_capacity"
+static int get_capacities(void)
+{
+	long num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+	char str[256] = {};
+	char *cap;
+	int read;
+
+	FILE *fp = popen("cat " SYSFS_CAPACITIES " | sort -un", "r");
+	if (!fp) {
+		perror("Can't read capacities");
+		return -1;
+	}
+
+	read = fread(str, 1, 256, fp);
+	fclose(fp);
+	if (!read) {
+		perror("Failed to read capacities");
+		return -1;
+	}
+
+	capacities.cap = calloc(num_cpus, sizeof(unsigned long));
+	cap = strtok(str, "\n");
+	while (cap) {
+		pr_debug("Adding capacity: %i\n", atoi(cap));
+		capacities.cap[capacities.len] = atoi(cap);
+		capacities.len++;
+		cap = strtok(NULL, "\n");
+	}
+
+	return 0;
+}
+
 /*
  * All events require to access this variable to get access to the ringbuffer.
  * Make it available for all event##_thread_fn.
@@ -64,29 +105,36 @@ static void *thread_loop(void *data)
 	struct sched_attr sched_attr;
 	int loops = NR_LOOPS;
 	pid_t pid = gettid();
-	int ret;
+	unsigned long cap;
+	int ret, i;
 
 	skel->bss->pid = pid;
 
 	ret = sched_getattr(pid, &sched_attr, sizeof(struct sched_attr), 0);
 	if (ret) {
 		perror("Failed to get attr");
-		printf("Couldn't get schedattr for pid %d\n", pid);
+		fprintf(stderr, "Couldn't get schedattr for pid %d\n", pid);
 		return NULL;
 	}
-	sched_attr.sched_util_min = 1024;
-	sched_attr.sched_flags = SCHED_FLAG_KEEP_ALL | SCHED_FLAG_UTIL_CLAMP;
-	ret = sched_setattr(pid, &sched_attr, 0);
-	if (ret) {
-		perror("Failed to set attr");
-		printf("Couldn't set schedattr for pid %d\n", pid);
+
+	ret = get_capacities();
+	if (ret)
 		return NULL;
-	}
 
 	while (!start)
 		usleep(5000);
 
-	while (!done) {
+	for_each_capacity(cap, i) {
+
+		pr_debug("Setting capacity: %lu\n", cap);
+		sched_attr.sched_util_min = cap;
+		sched_attr.sched_flags = SCHED_FLAG_KEEP_ALL | SCHED_FLAG_UTIL_CLAMP;
+		ret = sched_setattr(pid, &sched_attr, 0);
+		if (ret) {
+			perror("Failed to set attr");
+			fprintf(stderr, "Couldn't set schedattr for pid %d\n", pid);
+			return NULL;
+		}
 
 		if (!loops--) {
 			loops = NR_LOOPS;
@@ -131,15 +179,10 @@ int main(int argc, char **argv)
 
 	CREATE_EVENT_THREAD(rq_pelt);
 
-	start = true;
-	sleep(10);
-	pr_debug("pid: %u\n", skel->bss->pid);
-
 cleanup:
-	if (!start)
-		start = true;
-	done = true;
+	start = true;
 	pthread_join(thread, NULL);
+	done = true;
 
 	pr_debug("main pid: %u\n", gettid());
 
