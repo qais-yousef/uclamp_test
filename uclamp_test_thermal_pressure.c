@@ -24,7 +24,7 @@
 #endif
 
 
-#define NR_LOOPS	1000000
+#define NR_LOOPS	100
 
 static bool volatile start = false;
 static bool volatile done = false;
@@ -37,6 +37,12 @@ struct capacities {
 #define for_each_capacity(cap, i)	\
 	for ((i) = 0, (cap) = capacities.cap[(i)]; (i) < capacities.len; (i)+=1, (cap) = capacities.cap[(i)])
 
+static inline __attribute__((always_inline)) void do_work() {
+	int loops = NR_LOOPS;
+
+	while (loops--)
+		usleep(16000);
+}
 
 static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 {
@@ -103,7 +109,6 @@ EVENT_THREAD_FN(rq_pelt)
 static void *thread_loop(void *data)
 {
 	struct sched_attr sched_attr;
-	int loops = NR_LOOPS;
 	pid_t pid = gettid();
 	unsigned long cap;
 	int ret, i;
@@ -124,6 +129,9 @@ static void *thread_loop(void *data)
 	while (!start)
 		usleep(5000);
 
+	/* Run first with default values */
+	do_work();
+
 	for_each_capacity(cap, i) {
 
 		pr_debug("Setting capacity: %lu\n", cap);
@@ -135,11 +143,7 @@ static void *thread_loop(void *data)
 			fprintf(stderr, "Couldn't set schedattr for pid %d\n", pid);
 			return NULL;
 		}
-
-		if (!loops--) {
-			loops = NR_LOOPS;
-			usleep(16000);
-		}
+		do_work();
 	}
 
 	pr_debug("thread_loop pid: %u\n", gettid());
