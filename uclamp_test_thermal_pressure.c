@@ -60,9 +60,22 @@ EVENT_THREAD_FN(rq_pelt)
 
 static void *thread_loop(void *data)
 {
+	struct sched_attr sched_attr;
 	int loops = NR_LOOPS;
+	pid_t pid = gettid();
+	int ret;
 
-	skel->bss->pid = gettid();
+	skel->bss->pid = pid;
+
+	ret = sched_getattr(pid, &sched_attr, sizeof(struct sched_attr), 0);
+	if (ret) {
+		perror("Failed to get attr");
+		printf("Couldn't get schedattr for pid %d\n", pid);
+		return NULL;
+	}
+	sched_attr.sched_util_min = 1024;
+	sched_attr.sched_flags = SCHED_FLAG_KEEP_ALL | SCHED_FLAG_UTIL_CLAMP;
+	sched_setattr(pid, &sched_attr, 0);
 
 	while (!start)
 		usleep(5000);
