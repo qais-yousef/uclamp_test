@@ -13,10 +13,6 @@
 
 #include "uclamp_test_thermal_pressure.skel.h"
 
-#define NR_LOOPS	1000000
-
-static bool done = false;
-
 //#define DEBUG
 #ifdef DEBUG
 #define pr_debug	printf
@@ -25,9 +21,21 @@ static bool done = false;
 #endif
 
 
+#define NR_LOOPS	1000000
+
+static bool volatile start = false;
+static bool volatile done = false;
+
+
 static void *thread_loop(void *data)
 {
+	struct uclamp_test_thermal_pressure_bpf *skel = data;
 	volatile int loops = NR_LOOPS;
+
+	skel->bss->pid = getpid();
+
+	while (!start)
+		usleep(10000);
 
 	while (!done) {
 
@@ -50,7 +58,13 @@ int main(int argc, char **argv)
 	skel = uclamp_test_thermal_pressure_bpf__open();
 	if (!skel) {
 		fprintf(stderr, "Failed to open and load BPF skeleton\n");
-		return 1;
+		return EXIT_FAILURE;
+	}
+
+	ret = pthread_create(&thread, NULL, thread_loop, skel);
+	if (ret) {
+		perror("Failed to create thread");
+		goto cleanup;
 	}
 
 	ret = uclamp_test_thermal_pressure_bpf__load(skel);
@@ -65,18 +79,16 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	ret = pthread_create(&thread, NULL, thread_loop, NULL);
-	if (ret) {
-		perror("Failed to create thread");
-		goto cleanup;
-	}
-
+	start = true;
 	sleep(5);
+	printf("pid: %u\n", skel->bss->pid);
 
+cleanup:
+	if (!start)
+		start = true;
 	done = true;
 	pthread_join(thread, NULL);
 
-cleanup:
 	uclamp_test_thermal_pressure_bpf__destroy(skel);
 	return ret < 0 ? -ret : EXIT_SUCCESS;
 }

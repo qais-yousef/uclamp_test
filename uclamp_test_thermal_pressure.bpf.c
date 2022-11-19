@@ -13,18 +13,22 @@ struct {
 	__type(value, int);
 } sched_switch SEC(".maps");
 
+pid_t pid = 0;
 
 SEC("raw_tp/sched_switch")
 int BPF_PROG(handle_sched_switch, bool preempt,
 	     struct task_struct *prev, struct task_struct *next,
 	     unsigned int prev_state)
 {
-	pid_t pid;
+	pid_t ppid;
 	int cpu, i = 0;
 	int *count;
 
-	pid = BPF_CORE_READ(prev, pid);
+	ppid = BPF_CORE_READ(prev, pid);
 	cpu = BPF_CORE_READ(prev, cpu);
+
+	if (!pid || pid != ppid)
+		return 0;
 
 	count = bpf_map_lookup_elem(&sched_switch, &cpu);
 	if (count)
