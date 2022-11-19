@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/* Copyright (C) 2022 Qais Yousef */
 #include "events_defs.h"
 #include "sched.h"
 
