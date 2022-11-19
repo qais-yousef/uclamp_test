@@ -14,5 +14,5 @@ fi
 ITERATIONS=${1:-10}
 for i in $(seq $ITERATIONS);
 do
-	$SUDO ./uclamp_test
+	$SUDO ./uclamp_test_rt_default
 done
