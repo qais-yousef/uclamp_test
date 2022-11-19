@@ -21,7 +21,7 @@
 #endif
 
 
-#define NR_LOOPS	1000000
+#define NR_LOOPS	100000
 
 static bool volatile start = false;
 static bool volatile done = false;
@@ -30,21 +30,22 @@ static bool volatile done = false;
 static void *thread_loop(void *data)
 {
 	struct uclamp_test_thermal_pressure_bpf *skel = data;
-	volatile int loops = NR_LOOPS;
+	int loops = NR_LOOPS;
 
-	skel->bss->pid = getpid();
+	skel->bss->pid = gettid();
 
 	while (!start)
-		usleep(10000);
+		usleep(5000);
 
 	while (!done) {
 
-		while (loops--);
-
-		loops = NR_LOOPS;
-
-		usleep(500);
+		if (!loops--) {
+			loops = NR_LOOPS;
+			usleep(16000);
+		}
 	}
+
+	pr_debug("thread_loop pid: %u\n", gettid());
 
 	return NULL;
 }
@@ -80,14 +81,16 @@ int main(int argc, char **argv)
 	}
 
 	start = true;
-	sleep(5);
-	printf("pid: %u\n", skel->bss->pid);
+	sleep(10);
+	pr_debug("pid: %u\n", skel->bss->pid);
 
 cleanup:
 	if (!start)
 		start = true;
 	done = true;
 	pthread_join(thread, NULL);
+
+	pr_debug("main pid: %u\n", gettid());
 
 	uclamp_test_thermal_pressure_bpf__destroy(skel);
 	return ret < 0 ? -ret : EXIT_SUCCESS;

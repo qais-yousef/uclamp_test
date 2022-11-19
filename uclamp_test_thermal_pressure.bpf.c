@@ -21,7 +21,7 @@ int BPF_PROG(handle_sched_switch, bool preempt,
 	     unsigned int prev_state)
 {
 	pid_t ppid;
-	int cpu, i = 0;
+	int cpu, i = 1;
 	int *count;
 
 	ppid = BPF_CORE_READ(prev, pid);
