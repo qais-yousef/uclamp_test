@@ -76,7 +76,12 @@ static void *thread_loop(void *data)
 	}
 	sched_attr.sched_util_min = 1024;
 	sched_attr.sched_flags = SCHED_FLAG_KEEP_ALL | SCHED_FLAG_UTIL_CLAMP;
-	sched_setattr(pid, &sched_attr, 0);
+	ret = sched_setattr(pid, &sched_attr, 0);
+	if (ret) {
+		perror("Failed to set attr");
+		printf("Couldn't set schedattr for pid %d\n", pid);
+		return NULL;
+	}
 
 	while (!start)
 		usleep(5000);
