@@ -53,11 +53,11 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	/* 	file = fopen("uclamp_test_thermal_pressure.csv", "w"); */
 	/* 	if (!file) */
 	/* 		return 0; */
-	/* 	fprintf(file, "ts,cpu,util, capacity_orig, thermal_avg, uclamp_min,uclamp_max\n"); */
+	/* 	fprintf(file, "ts,cpu,util, capacity_orig, thermal_avg, uclamp_min,uclamp_max, overutilized\n"); */
 	/* } */
 
-	fprintf(stdout, "%llu,%d,%lu, %lu, %lu, %lu,%lu\n",
-		e->ts,e->cpu, e->util_avg, e->capacity_orig, e->thermal_avg, e->uclamp_min, e->uclamp_max);
+	fprintf(stdout, "%llu,%d,%lu, %lu, %lu, %lu,%lu, %d\n",
+		e->ts,e->cpu, e->util_avg, e->capacity_orig, e->thermal_avg, e->uclamp_min, e->uclamp_max, e->overutilized);
 
 	return 0;
 }

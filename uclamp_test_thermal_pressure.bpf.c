@@ -35,6 +35,7 @@ int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p)
 	unsigned long capacity_orig = BPF_CORE_READ(rq, cpu_capacity_orig);
 	unsigned long uclamp_min = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MIN].value);
 	unsigned long uclamp_max = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MAX].value);
+	int overutilized = BPF_CORE_READ(rq, rd, overutilized);
 
 	if (!pid || pid != ppid)
 		return 0;
@@ -48,6 +49,7 @@ int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p)
 		e->capacity_orig = capacity_orig;
 		e->uclamp_min = uclamp_min;
 		e->uclamp_max = uclamp_max;
+		e->overutilized = overutilized;
 		bpf_ringbuf_submit(e, 0);
 	}
 	return 0;

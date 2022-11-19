@@ -11,6 +11,7 @@ struct rq_pelt_event {
 	unsigned long thermal_avg;
 	unsigned long uclamp_min;
 	unsigned long uclamp_max;
+	int overutilized;
 };
 
 #endif /* __UCLAMP_TEST_THERMAL_PRESSURE_EVENTS_H__ */
