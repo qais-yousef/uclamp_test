@@ -65,7 +65,7 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 			return 0;
 		}
 		fprintf(stdout, "Created %s\n", CSV_FILE);
-		fprintf(file, "ts,cpu,util, capacity_orig, thermal_avg, uclamp_min,uclamp_max, overutilized\n");
+		fprintf(file, "ts, cpu, rq_util, p_util, capacity_orig, thermal_avg, uclamp_min, uclamp_max, overutilized\n");
 	}
 
 	if (e->uclamp_min > e->capacity_orig)
@@ -87,8 +87,8 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 		}
 	}
 
-	fprintf(file, "%llu,%d,%lu, %lu, %lu, %lu,%lu, %d\n",
-		e->ts,e->cpu, e->util_avg, e->capacity_orig, e->thermal_avg, e->uclamp_min, e->uclamp_max, e->overutilized);
+	fprintf(file, "%llu, %d, %lu, %lu, %lu, %lu, %lu,%lu, %d\n",
+		e->ts, e->cpu, e->rq_util_avg, e->p_util_avg, e->capacity_orig, e->thermal_avg, e->uclamp_min, e->uclamp_max, e->overutilized);
 
 	return 0;
 }

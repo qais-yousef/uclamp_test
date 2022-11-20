@@ -30,7 +30,8 @@ int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p)
 	pid_t ppid = BPF_CORE_READ(p, pid);
 	int cpu = BPF_CORE_READ(rq, cpu);
 
-	unsigned long util_avg = BPF_CORE_READ(rq, cfs.avg.util_avg);
+	unsigned long rq_util_avg = BPF_CORE_READ(rq, cfs.avg.util_avg);
+	unsigned long p_util_avg = BPF_CORE_READ(p, se.avg.util_avg);
 	unsigned long thermal_avg = BPF_CORE_READ(rq, avg_thermal.util_avg);
 	unsigned long capacity_orig = BPF_CORE_READ(rq, cpu_capacity_orig);
 	unsigned long uclamp_min = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MIN].value);
@@ -44,7 +45,8 @@ int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p)
 	if (e) {
 		e->ts = bpf_ktime_get_ns();
 		e->cpu = cpu;
-		e->util_avg = util_avg;
+		e->rq_util_avg = rq_util_avg;
+		e->p_util_avg = p_util_avg;
 		e->thermal_avg = thermal_avg;
 		e->capacity_orig = capacity_orig;
 		e->uclamp_min = uclamp_min;

@@ -6,7 +6,8 @@
 struct rq_pelt_event {
 	unsigned long long ts;
 	int cpu;
-	unsigned long util_avg;
+	unsigned long rq_util_avg;
+	unsigned long p_util_avg;
 	unsigned long capacity_orig;
 	unsigned long thermal_avg;
 	unsigned long uclamp_min;
