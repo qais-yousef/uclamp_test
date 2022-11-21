@@ -17,6 +17,13 @@ char LICENSE[] SEC("license") = "GPL";
 pid_t pid = 0;
 
 struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 8192);
+	__type(key, int);
+	__type(value, int);
+} compute_energy_map SEC(".maps");
+
+struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, RB_SIZE);
 } rq_pelt_rb SEC(".maps");
@@ -54,5 +61,33 @@ int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p)
 		e->overutilized = overutilized;
 		bpf_ringbuf_submit(e, 0);
 	}
+	return 0;
+}
+
+SEC("kprobe/compute_energy")
+int BPF_KPROBE(kprobe_compute_energy, struct task_struct *p, int dst_cpu)
+{
+	int cpu = bpf_get_smp_processor_id();
+	pid_t ppid = BPF_CORE_READ(p, pid);
+
+	if (!pid || pid != ppid)
+		return 0;
+
+	bpf_map_update_elem(&compute_energy_map, &cpu, &dst_cpu, BPF_ANY);
+	return 0;
+}
+
+SEC("kretprobe/compute_energy")
+int BPF_KRETPROBE(kretprobe_compute_energy)
+{
+	int cpu = bpf_get_smp_processor_id();
+	int ret = PT_REGS_RC(ctx);
+	int *dst_cpu;
+
+	dst_cpu = bpf_map_lookup_elem(&compute_energy_map, &cpu);
+	if (!dst_cpu)
+		return 0;
+
+	bpf_printk("energy cost on %d: %d\n", *dst_cpu, ret);
 	return 0;
 }
