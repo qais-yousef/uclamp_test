@@ -44,7 +44,7 @@ static inline __attribute__((always_inline)) void do_work() {
 		usleep(16000);
 }
 
-#define CSV_FILE	"uclamp_test_thermal_pressure.csv"
+#define PELT_CSV_FILE	"uclamp_test_thermal_pressure_pelt.csv"
 static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 {
 	struct rq_pelt_event *e = data;
@@ -56,15 +56,15 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	capacity_thermal = e->capacity_orig - e->thermal_avg;
 
 	if (!file) {
-		file = fopen(CSV_FILE, "w");
+		file = fopen(PELT_CSV_FILE, "w");
 		if (!file) {
 			if (!err_once) {
 				err_once = true;
-				fprintf(stderr, "Failed to create %s file\n", CSV_FILE);
+				fprintf(stderr, "Failed to create %s file\n", PELT_CSV_FILE);
 			}
 			return 0;
 		}
-		fprintf(stdout, "Created %s\n", CSV_FILE);
+		fprintf(stdout, "Created %s\n", PELT_CSV_FILE);
 		fprintf(file, "ts, cpu, rq_util, p_util, capacity_orig, thermal_avg, uclamp_min, uclamp_max, overutilized\n");
 	}
 
@@ -89,6 +89,32 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 
 	fprintf(file, "%llu, %d, %lu, %lu, %lu, %lu, %lu,%lu, %d\n",
 		e->ts, e->cpu, e->rq_util_avg, e->p_util_avg, e->capacity_orig, e->thermal_avg, e->uclamp_min, e->uclamp_max, e->overutilized);
+
+	return 0;
+}
+
+#define COMPUTE_ENERGY_CSV_FILE	"uclamp_test_thermal_pressure_compute_energy.csv"
+static int handle_compute_energy_event(void *ctx, void *data, size_t data_sz)
+{
+	struct compute_energy_event *e = data;
+	static FILE *file = NULL;
+	static bool err_once = false;
+
+	if (!file) {
+		file = fopen(COMPUTE_ENERGY_CSV_FILE, "w");
+		if (!file) {
+			if (!err_once) {
+				err_once = true;
+				fprintf(stderr, "Failed to create %s file\n", COMPUTE_ENERGY_CSV_FILE);
+			}
+			return 0;
+		}
+		fprintf(stdout, "Created %s\n", COMPUTE_ENERGY_CSV_FILE);
+		fprintf(file, "ts, dst_cpu, p_util, uclamp_min, uclamp_max, energy\n");
+	}
+
+	fprintf(file, "%llu, %d, %lu, %lu, %lu, %lu\n",
+		e->ts, e->dst_cpu, e->p_util_avg, e->uclamp_min, e->uclamp_max, e->energy);
 
 	return 0;
 }
@@ -136,6 +162,7 @@ struct uclamp_test_thermal_pressure_bpf *skel;
  * Define a pthread function handler for each event
  */
 EVENT_THREAD_FN(rq_pelt)
+EVENT_THREAD_FN(compute_energy)
 
 static void *thread_loop(void *data)
 {
@@ -185,6 +212,7 @@ static void *thread_loop(void *data)
 int main(int argc, char **argv)
 {
 	INIT_EVENT_THREAD(rq_pelt);
+	INIT_EVENT_THREAD(compute_energy);
 	pthread_t thread;
 	int ret;
 
@@ -213,6 +241,7 @@ int main(int argc, char **argv)
 	}
 
 	CREATE_EVENT_THREAD(rq_pelt);
+	CREATE_EVENT_THREAD(compute_energy);
 
 cleanup:
 	start = true;
@@ -222,6 +251,7 @@ cleanup:
 	pr_debug("main pid: %u\n", gettid());
 
 	DESTROY_EVENT_THREAD(rq_pelt);
+	DESTROY_EVENT_THREAD(compute_energy);
 	uclamp_test_thermal_pressure_bpf__destroy(skel);
 	return ret < 0 ? -ret : EXIT_SUCCESS;
 }

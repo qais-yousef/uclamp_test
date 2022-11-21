@@ -15,4 +15,13 @@ struct rq_pelt_event {
 	int overutilized;
 };
 
+struct compute_energy_event {
+	unsigned long long ts;
+	int dst_cpu;
+	unsigned long p_util_avg;
+	unsigned long uclamp_min;
+	unsigned long uclamp_max;
+	unsigned long energy;
+};
+
 #endif /* __UCLAMP_TEST_THERMAL_PRESSURE_EVENTS_H__ */
