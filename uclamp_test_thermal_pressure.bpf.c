@@ -79,6 +79,9 @@ int BPF_KPROBE(kprobe_compute_energy, struct task_struct *p, int dst_cpu)
 	int cpu = bpf_get_smp_processor_id();
 	pid_t ppid = BPF_CORE_READ(p, pid);
 
+	if (dst_cpu == -1)
+		return 0;
+
 	unsigned long p_util_avg = BPF_CORE_READ(p, se.avg.util_avg);
 	unsigned long uclamp_min = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MIN].value);
 	unsigned long uclamp_max = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MAX].value);
