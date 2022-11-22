@@ -182,7 +182,7 @@ static inline __attribute__((always_inline)) void do_busy_work(void)
 			result = sqrt(result);
 		}
 		i = 10000000;
-		usleep(16000);
+		usleep(500);
 	}
 }
 
@@ -283,8 +283,8 @@ static int test_uclamp_max(void)
 
 	fprintf(stdout, "::-- Testing uclamp_max --::\n");
 
-	/* Run first with default values */
-	ret = set_uclamp_values(&sched_attr, 0, 1024);
+	/* Run first with 0 */
+	ret = set_uclamp_values(&sched_attr, 0, 0);
 	if (ret)
 		return ret;
 	do_busy_work();
@@ -299,7 +299,7 @@ static int test_uclamp_max(void)
 
 	/* Run at capacity boundaries + 1 */
 	for_each_capacity(cap, i) {
-		cap = cap == 1024 ? 1024 : cap + 1;
+		cap = cap == 1024? 1023 : cap + 1;
 		ret = set_uclamp_values(&sched_attr, 0, cap);
 		if (ret)
 			return ret;
