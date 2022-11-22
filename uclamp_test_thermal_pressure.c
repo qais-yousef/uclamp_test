@@ -72,8 +72,10 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	}
 
 	for_each_capacity(cap, i) {
+#ifdef VERBOSE
 		if (e->uclamp_min <= cap && e->capacity_orig > cap)
 			fprintf(stderr, "[%llu] Warning: uclamp_min = %lu --::-- running on %lu instead of %lu\n", e->ts, e->uclamp_min, e->capacity_orig, cap);
+#endif
 
 		if (cap < e->capacity_orig && capacity_thermal < cap) {
 			fprintf(stderr, "[%llu] Warning: capacity_inversion --::-- capacity_orig - thermal_avg < cap --::-- %lu - %lu (%lu) < %lu\n",
