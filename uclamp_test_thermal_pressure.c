@@ -4,6 +4,7 @@
 #include "sched.h"
 
 #include <bpf/libbpf.h>
+#include <math.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -36,13 +37,6 @@ struct capacities {
 
 #define for_each_capacity(cap, i)	\
 	for ((i) = 0, (cap) = capacities.cap[(i)]; (i) < capacities.len; (i)+=1, (cap) = capacities.cap[(i)])
-
-static inline __attribute__((always_inline)) void do_work() {
-	int loops = NR_LOOPS;
-
-	while (loops--)
-		usleep(16000);
-}
 
 #define PELT_CSV_FILE	"uclamp_test_thermal_pressure_pelt.csv"
 static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
@@ -164,21 +158,133 @@ struct uclamp_test_thermal_pressure_bpf *skel;
 EVENT_THREAD_FN(rq_pelt)
 EVENT_THREAD_FN(compute_energy)
 
-static void *thread_loop(void *data)
+static inline __attribute__((always_inline)) void do_light_work(void)
+{
+	int loops = NR_LOOPS;
+
+	while (loops--)
+		usleep(16000);
+}
+
+static inline __attribute__((always_inline)) void do_busy_work(void)
+{
+	int loops = NR_LOOPS;
+	int i = 1000;
+
+	while (loops--) {
+		while (i--)
+			sqrt(pow(i, i));
+		i = 1000;
+		usleep(16000);
+	}
+}
+
+static int set_uclamp_values(struct sched_attr *sched_attr,
+			     unsigned long uclamp_min, unsigned long uclamp_max)
+{
+	pid_t pid = gettid();
+	int ret;
+
+	pr_debug("Setting uclamp_min: %lu uclamp_max: %lu\n", uclamp_min, uclamp_max);
+	sched_attr->sched_util_min = uclamp_min;
+	sched_attr->sched_util_max = uclamp_max;
+	sched_attr->sched_flags = SCHED_FLAG_KEEP_ALL | SCHED_FLAG_UTIL_CLAMP;
+	ret = sched_setattr(pid, sched_attr, 0);
+	if (ret) {
+		perror("Failed to set attr");
+		fprintf(stderr, "Couldn't set schedattr for pid %d\n", pid);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int test_uclamp_min(void)
 {
 	struct sched_attr sched_attr;
 	pid_t pid = gettid();
 	unsigned long cap;
 	int ret, i;
 
-	skel->bss->pid = pid;
+	ret = sched_getattr(pid, &sched_attr, sizeof(struct sched_attr), 0);
+	if (ret) {
+		perror("Failed to get attr");
+		fprintf(stderr, "Couldn't get schedattr for pid %d\n", pid);
+		return ret;
+	}
+
+	/* Run first with default values */
+	ret = set_uclamp_values(&sched_attr, 0, 1024);
+	if (ret)
+		return ret;
+	do_light_work();
+
+	/* Run at capacity boundaries */
+	for_each_capacity(cap, i) {
+		ret = set_uclamp_values(&sched_attr, cap, 1024);
+		if (ret)
+			return ret;
+		do_light_work();
+	}
+
+	/* Run at capacity boundaries + 1 */
+	for_each_capacity(cap, i) {
+		cap = cap == 1024 ? 1024 : cap + 1;
+		ret = set_uclamp_values(&sched_attr, cap, 1024);
+		if (ret)
+			return ret;
+		do_light_work();
+	}
+
+	return 0;
+}
+
+static int test_uclamp_max(void)
+{
+	struct sched_attr sched_attr;
+	pid_t pid = gettid();
+	unsigned long cap;
+	int ret, i;
 
 	ret = sched_getattr(pid, &sched_attr, sizeof(struct sched_attr), 0);
 	if (ret) {
 		perror("Failed to get attr");
 		fprintf(stderr, "Couldn't get schedattr for pid %d\n", pid);
-		return NULL;
+		return ret;
 	}
+
+	/* Run first with default values */
+	ret = set_uclamp_values(&sched_attr, 0, 1024);
+	if (ret)
+		return ret;
+	do_busy_work();
+
+	/* Run at capacity boundaries */
+	for_each_capacity(cap, i) {
+		ret = set_uclamp_values(&sched_attr, 0, cap);
+		if (ret)
+			return ret;
+		do_busy_work();
+	}
+
+	/* Run at capacity boundaries + 1 */
+	for_each_capacity(cap, i) {
+		cap = cap == 1024 ? 1024 : cap + 1;
+		ret = set_uclamp_values(&sched_attr, 0, cap);
+		if (ret)
+			return ret;
+		do_busy_work();
+	}
+
+	return 0;
+}
+
+static void *thread_loop(void *data)
+{
+	pid_t pid = gettid();
+	int ret;
+
+	skel->bss->pid = pid;
 
 	ret = get_capacities();
 	if (ret)
@@ -187,24 +293,15 @@ static void *thread_loop(void *data)
 	while (!start)
 		usleep(5000);
 
-	/* Run first with default values */
-	do_work();
+	ret = test_uclamp_min();
+	if (ret)
+		return NULL;
 
-	for_each_capacity(cap, i) {
+	ret = test_uclamp_max();
+	if (ret)
+		return NULL;
 
-		pr_debug("Setting capacity: %lu\n", cap);
-		sched_attr.sched_util_min = cap;
-		sched_attr.sched_flags = SCHED_FLAG_KEEP_ALL | SCHED_FLAG_UTIL_CLAMP;
-		ret = sched_setattr(pid, &sched_attr, 0);
-		if (ret) {
-			perror("Failed to set attr");
-			fprintf(stderr, "Couldn't set schedattr for pid %d\n", pid);
-			return NULL;
-		}
-		do_work();
-	}
-
-	pr_debug("thread_loop pid: %u\n", gettid());
+	pr_debug("thread_loop pid: %u\n", pid);
 
 	return NULL;
 }
