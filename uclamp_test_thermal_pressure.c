@@ -68,8 +68,10 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	if (e->p_util_avg > e->uclamp_max && e->rq_util_avg == e->uclamp_max &&  e->uclamp_max < e->capacity_orig)
 		fprintf(stderr, "[%llu] Warning: uclamp_max < capacity_orig --::-- %lu < %lu\n", e->ts, e->uclamp_max, e->capacity_orig);
 
+#ifdef VERBOSE
 	if (e->p_util_avg > e->uclamp_max && e->rq_util_avg > e->uclamp_max)
 		fprintf(stderr, "[%llu] Warning: rq_util_avg > uclamp_max --::-- %lu > %lu\n", e->ts, e->rq_util_avg, e->uclamp_max);
+#endif
 
 	if (e->capacity_orig != 1024 && e->uclamp_min > capacity_thermal) {
 		fprintf(stderr, "[%llu] Failed: uclamp_min > capacity_orig - thermal_avg --::-- %lu > %lu - %lu (%lu)\n",
