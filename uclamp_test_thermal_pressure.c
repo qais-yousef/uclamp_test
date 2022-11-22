@@ -65,6 +65,8 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	if (e->uclamp_min > e->capacity_orig)
 		fprintf(stderr, "[%llu] Failed: uclamp_min > capacity_orig --::-- %lu > %lu\n", e->ts, e->uclamp_min, e->capacity_orig);
 
+	if (e->p_util_avg > e->uclamp_max &&  e->uclamp_max > e->capacity_orig)
+		fprintf(stderr, "[%llu] Failed: uclamp_max > capacity_orig --::-- %lu > %lu\n", e->ts, e->uclamp_max, e->capacity_orig);
 
 	if (e->capacity_orig != 1024 && e->uclamp_min > capacity_thermal) {
 		fprintf(stderr, "[%llu] Failed: uclamp_min > capacity_orig - thermal_avg --::-- %lu > %lu - %lu (%lu)\n",
@@ -171,12 +173,15 @@ static inline __attribute__((always_inline)) void do_light_work(void)
 static inline __attribute__((always_inline)) void do_busy_work(void)
 {
 	int loops = NR_LOOPS;
-	int i = 1000;
+	int i = 10000000;
+	int result;
 
 	while (loops--) {
-		while (i--)
-			sqrt(pow(i, i));
-		i = 1000;
+		while (i--) {
+			result = pow(i, i);
+			result = sqrt(result);
+		}
+		i = 10000000;
 		usleep(16000);
 	}
 }
