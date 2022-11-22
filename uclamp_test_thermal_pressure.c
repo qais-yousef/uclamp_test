@@ -187,7 +187,7 @@ static int set_uclamp_values(struct sched_attr *sched_attr,
 	pid_t pid = gettid();
 	int ret;
 
-	pr_debug("Setting uclamp_min: %lu uclamp_max: %lu\n", uclamp_min, uclamp_max);
+	fprintf(stdout, "Setting uclamp_min: %lu uclamp_max: %lu\n", uclamp_min, uclamp_max);
 	sched_attr->sched_util_min = uclamp_min;
 	sched_attr->sched_util_max = uclamp_max;
 	sched_attr->sched_flags = SCHED_FLAG_KEEP_ALL | SCHED_FLAG_UTIL_CLAMP;
@@ -214,6 +214,8 @@ static int test_uclamp_min(void)
 		fprintf(stderr, "Couldn't get schedattr for pid %d\n", pid);
 		return ret;
 	}
+
+	fprintf(stdout, "::-- Testing uclamp_min --::\n");
 
 	/* Run first with default values */
 	ret = set_uclamp_values(&sched_attr, 0, 1024);
@@ -254,6 +256,8 @@ static int test_uclamp_max(void)
 		fprintf(stderr, "Couldn't get schedattr for pid %d\n", pid);
 		return ret;
 	}
+
+	fprintf(stdout, "::-- Testing uclamp_max --::\n");
 
 	/* Run first with default values */
 	ret = set_uclamp_values(&sched_attr, 0, 1024);
