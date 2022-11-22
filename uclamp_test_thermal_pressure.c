@@ -4,7 +4,6 @@
 #include "sched.h"
 
 #include <bpf/libbpf.h>
-#include <math.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -40,14 +39,9 @@ struct capacities {
 
 static inline __attribute__((always_inline)) void do_work() {
 	int loops = NR_LOOPS;
-	int i = 1000000;
 
-	while (loops--) {
-		while (i--)
-			sqrt(pow(i, i));
-		i = 1000000;
+	while (loops--)
 		usleep(16000);
-	}
 }
 
 #define PELT_CSV_FILE	"uclamp_test_thermal_pressure_pelt.csv"

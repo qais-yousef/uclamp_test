@@ -3,7 +3,7 @@ BPF_SKEL=$(subst .bpf.c,.skel.h, $(wildcard *.bpf.c))
 
 CFLAGS=-O2 -Wall -g
 INCLUDE=-I bpf/usr/include
-LIBS=-lpthread bpf/usr/lib64/libbpf.a -lelf -lz -lm -static
+LIBS=-lpthread bpf/usr/lib64/libbpf.a -lelf -lz -static
 
 ARCH ?= arm64
 
