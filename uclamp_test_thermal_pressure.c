@@ -186,6 +186,23 @@ static inline __attribute__((always_inline)) void do_busy_work(void)
 	}
 }
 
+static void print_uclamp_values(void)
+{
+	struct sched_attr sched_attr;
+	pid_t pid = gettid();
+	int ret;
+
+	ret = sched_getattr(pid, &sched_attr, sizeof(struct sched_attr), 0);
+	if (ret) {
+		perror("Failed to get attr");
+		fprintf(stderr, "Couldn't get schedattr for pid %d\n", pid);
+		return;
+	}
+
+	fprintf(stdout, "Getting uclamp_min: %u uclamp_max: %u\n",
+		sched_attr.sched_util_min, sched_attr.sched_util_max);
+}
+
 static int set_uclamp_values(struct sched_attr *sched_attr,
 			     unsigned long uclamp_min, unsigned long uclamp_max)
 {
@@ -202,6 +219,8 @@ static int set_uclamp_values(struct sched_attr *sched_attr,
 		fprintf(stderr, "Couldn't set schedattr for pid %d\n", pid);
 		return ret;
 	}
+
+	print_uclamp_values();
 
 	return 0;
 }
