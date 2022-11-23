@@ -316,6 +316,7 @@ static int test_uclamp_max(void)
 	ret = set_uclamp_values(&sched_attr, 0, 0);
 	if (ret)
 		return ret;
+	do_light_work();
 	do_busy_work();
 
 	/* Run at capacity boundaries */
@@ -323,6 +324,7 @@ static int test_uclamp_max(void)
 		ret = set_uclamp_values(&sched_attr, 0, cap);
 		if (ret)
 			return ret;
+		do_light_work();
 		do_busy_work();
 	}
 
@@ -332,6 +334,7 @@ static int test_uclamp_max(void)
 		ret = set_uclamp_values(&sched_attr, 0, cap);
 		if (ret)
 			return ret;
+		do_light_work();
 		do_busy_work();
 	}
 
