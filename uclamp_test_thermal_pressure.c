@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "uclamp_test_thermal_pressure.skel.h"
@@ -179,17 +180,38 @@ static inline __attribute__((always_inline)) void do_light_work(void)
 
 static inline __attribute__((always_inline)) void do_busy_work(void)
 {
+	struct timespec start, ts;
+	long int time_diff_us;
 	int loops = NR_LOOPS;
-	int i = 10000000;
-	int result;
+	int result, ret;
 
 	while (loops--) {
-		while (i--) {
-			result = pow(i, i);
-			result = sqrt(result);
+		ret = clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+		if (ret) {
+			perror("Failed to get time");
+			return;
 		}
-		i = 10000000;
-		usleep(500);
+		while (true) {
+			result = pow(loops, loops);
+			result = sqrt(result);
+
+			ret = clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+			if (ret) {
+				perror("Failed to get time");
+				return;
+			}
+
+			time_diff_us = (ts.tv_sec - start.tv_sec) * 1000000;
+			time_diff_us += (ts.tv_nsec - start.tv_nsec) / 1000;
+
+			pr_debug("ts.tv_sec: %ld ts.tv_nsec: %ld\n", ts.tv_sec, ts.tv_nsec);
+			pr_debug("start.tv_sec: %ld start.tv_nsec: %ld\n", start.tv_sec, start.tv_nsec);
+			pr_debug("time_diff: %ld\n", time_diff_us);
+
+			if (time_diff_us >= 12000)
+				break;
+		}
+		usleep(4000);
 	}
 }
 
@@ -376,6 +398,9 @@ int main(int argc, char **argv)
 
 	CREATE_EVENT_THREAD(rq_pelt);
 	CREATE_EVENT_THREAD(compute_energy);
+
+	/* Wait for events threads to start */
+	sleep(1);
 
 cleanup:
 	start = true;
