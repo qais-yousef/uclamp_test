@@ -72,59 +72,32 @@ int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p)
 	return 0;
 }
 
-SEC("kprobe/compute_energy")
-int BPF_KPROBE(kprobe_compute_energy, struct task_struct *p, int dst_cpu)
+SEC("raw_tp/sched_compute_energy_tp")
+int BPF_PROG(handle_compute_energy, struct task_struct *p,
+	     int dst_cpu, unsigned long energy)
 {
-	struct compute_energy_event e[1] = {};
+	struct compute_energy_event *e;
 	pid_t ppid = BPF_CORE_READ(p, pid);
-	int key = 0;
 
 	if (dst_cpu == -1)
-		goto out;
+		return 0;
 
 	if (!pid || pid != ppid)
-		goto out;
+		return 0;
 
 	unsigned long p_util_avg = BPF_CORE_READ(p, se.avg.util_avg);
 	unsigned long uclamp_min = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MIN].value);
 	unsigned long uclamp_max = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MAX].value);
 
-	e->ts = bpf_ktime_get_ns();
-	e->dst_cpu = dst_cpu;
-	e->p_util_avg = p_util_avg;
-	e->uclamp_min = uclamp_min;
-	e->uclamp_max = uclamp_max;
-
-out:
-	bpf_map_update_elem(&compute_energy_map, &key, &e, BPF_ANY);
-
-	return 0;
-}
-
-SEC("kretprobe/compute_energy")
-int BPF_KRETPROBE(kretprobe_compute_energy)
-{
-	struct compute_energy_event *e,*erb;
-	int ret = PT_REGS_RC(ctx);
-	int key = 0;
-
-	e = bpf_map_lookup_elem(&compute_energy_map, &key);
-	if (!e)
-		return 0;
-
-	if (!e->ts)
-		return 0;
-
-	erb = bpf_ringbuf_reserve(&compute_energy_rb, sizeof(*erb), 0);
-	if (erb) {
-
-		erb->ts = e->ts;
-		erb->dst_cpu = e->dst_cpu;
-		erb->p_util_avg = e->p_util_avg;
-		erb->uclamp_min = e->uclamp_min;
-		erb->uclamp_max = e->uclamp_max;
-		erb->energy = ret;
-		bpf_ringbuf_submit(erb, 0);
+	e = bpf_ringbuf_reserve(&compute_energy_rb, sizeof(*e), 0);
+	if (e) {
+		e->ts = bpf_ktime_get_ns();
+		e->dst_cpu = dst_cpu;
+		e->p_util_avg = p_util_avg;
+		e->uclamp_min = uclamp_min;
+		e->uclamp_max = uclamp_max;
+		e->energy = energy;
+		bpf_ringbuf_submit(e, 0);
 	}
 
 	return 0;

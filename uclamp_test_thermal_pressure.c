@@ -208,10 +208,10 @@ static inline __attribute__((always_inline)) void do_busy_work(void)
 			pr_debug("start.tv_sec: %ld start.tv_nsec: %ld\n", start.tv_sec, start.tv_nsec);
 			pr_debug("time_diff: %ld\n", time_diff_us);
 
-			if (time_diff_us >= 12000)
+			if (time_diff_us >= 14000)
 				break;
 		}
-		usleep(4000);
+		usleep(2000);
 	}
 }
 
@@ -250,6 +250,8 @@ static int set_uclamp_values(struct sched_attr *sched_attr,
 	}
 
 	print_uclamp_values();
+
+	usleep(1000);
 
 	return 0;
 }
