@@ -45,10 +45,12 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	struct rq_pelt_event *e = data;
 	static FILE *file = NULL;
 	static bool err_once = false;
-	unsigned long capacity_thermal, cap, smallest_uclamp_max_cap;
+	unsigned long capacity_thermal, cap;
+	unsigned long smallest_uclamp_min_cap, smallest_uclamp_max_cap;
 	int i;
 
 	capacity_thermal = e->capacity_orig - e->thermal_avg;
+	smallest_uclamp_min_cap = e->capacity_orig;
 	smallest_uclamp_max_cap = e->capacity_orig;
 
 	if (!file) {
@@ -73,23 +75,21 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	}
 
 	for_each_capacity(cap, i) {
-#ifdef VERBOSE
-		/*
-		 * Detect of uclamp_min running at a bigger CPU than it needs
-		 * to. Not an error but somethiing might be noteworthy.
-		 */
-		if (e->uclamp_min <= cap && e->capacity_orig > cap)
-			fprintf(stderr, "[%llu] Warning: uclamp_min = %lu --::-- running on %lu instead of %lu\n", e->ts, e->uclamp_min, e->capacity_orig, cap);
-#endif
+
+		if (e->uclamp_min <= cap && cap < smallest_uclamp_min_cap)
+			smallest_uclamp_min_cap = cap;
+
+		if (e->uclamp_max <= cap && cap < smallest_uclamp_max_cap)
+			smallest_uclamp_max_cap = cap;
 
 		if (e->thermal_avg && cap < e->capacity_orig && capacity_thermal < cap) {
 			fprintf(stderr, "[%llu] Warning: capacity_inversion --::-- capacity_orig - thermal_avg < cap --::-- %lu - %lu (%lu) < %lu\n",
 				e->ts, e->capacity_orig, e->thermal_avg, capacity_thermal, cap);
 		}
-
-		if (e->uclamp_max <= cap && smallest_uclamp_max_cap > cap)
-			smallest_uclamp_max_cap = cap;
 	}
+
+	if (e->p_util_avg < e->uclamp_min && e->capacity_orig != smallest_uclamp_min_cap)
+		fprintf(stderr, "[%llu] Warning: uclamp_min not on smallest fitting cap --::-- %lu < %lu, is it more energy efficient?\n", e->ts, e->uclamp_min, e->capacity_orig);
 
 	if (e->capacity_orig != smallest_uclamp_max_cap)
 		fprintf(stderr, "[%llu] Failed: uclamp_max not on smallest fitting cap --::-- %lu < %lu\n", e->ts, e->uclamp_max, e->capacity_orig);
