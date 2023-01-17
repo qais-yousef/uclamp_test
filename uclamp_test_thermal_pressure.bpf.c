@@ -15,6 +15,7 @@ char LICENSE[] SEC("license") = "GPL";
 #define RB_SIZE		(256 * 1024)
 
 pid_t pid = 0;
+struct task_struct *task = NULL;
 
 
 /* Maps */
@@ -30,6 +31,11 @@ struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, RB_SIZE);
 } rq_pelt_rb SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, RB_SIZE);
+} select_task_rq_fair_rb SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -67,6 +73,53 @@ int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p)
 		e->uclamp_min = uclamp_min;
 		e->uclamp_max = uclamp_max;
 		e->overutilized = overutilized;
+		bpf_ringbuf_submit(e, 0);
+	}
+	return 0;
+}
+
+SEC("kprobe/select_task_rq_fair")
+int BPF_KPROBE(kprobe_select_task_rq_fair, struct task_struct *p)
+{
+	pid_t ppid = BPF_CORE_READ(p, pid);
+
+	if (!pid || pid != ppid)
+		return 0;
+
+	task = p;
+
+	return 0;
+}
+
+SEC("kretprobe/select_task_rq_fair")
+int BPF_KRETPROBE(kretprobe_select_task_rq_fair)
+{
+	int cpu = PT_REGS_RC(ctx);
+	struct select_task_rq_fair_event *e;
+	struct task_struct *p;
+
+	if (!task)
+		return 0;
+
+	p = task;
+	task = NULL;
+
+	pid_t ppid = BPF_CORE_READ(p, pid);
+
+	if (!pid || pid != ppid)
+		return 0;
+
+	unsigned long p_util_avg = BPF_CORE_READ(p, se.avg.util_avg);
+	unsigned long uclamp_min = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MIN].value);
+	unsigned long uclamp_max = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MAX].value);
+
+	e = bpf_ringbuf_reserve(&select_task_rq_fair_rb, sizeof(*e), 0);
+	if (e) {
+		e->ts = bpf_ktime_get_ns();
+		e->cpu = cpu;
+		e->p_util_avg = p_util_avg;
+		e->uclamp_min = uclamp_min;
+		e->uclamp_max = uclamp_max;
 		bpf_ringbuf_submit(e, 0);
 	}
 	return 0;

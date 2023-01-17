@@ -98,6 +98,33 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	return 0;
 }
 
+#define STRQF_CSV_FILE	"uclamp_test_thermal_pressure_strqf.csv"
+static int handle_select_task_rq_fair_event(void *ctx, void *data, size_t data_sz)
+{
+	struct select_task_rq_fair_event *e = data;
+	static FILE *file = NULL;
+	static bool err_once = false;
+
+	if (!file) {
+		file = fopen(STRQF_CSV_FILE, "w");
+		if (!file) {
+			if (!err_once) {
+				err_once = true;
+				fprintf(stderr, "Failed to create %s file\n", STRQF_CSV_FILE);
+			}
+			return 0;
+		}
+		fprintf(stdout, "Created %s\n", STRQF_CSV_FILE);
+		fprintf(file, "ts, cpu, p_util, uclamp_min, uclamp_max\n");
+	}
+
+	fprintf(file, "%llu, %d, %lu, %lu,%lu\n",
+		e->ts, e->cpu, e->p_util_avg, e->uclamp_min, e->uclamp_max);
+
+	fflush(file);
+	return 0;
+}
+
 #define COMPUTE_ENERGY_CSV_FILE	"uclamp_test_thermal_pressure_compute_energy.csv"
 static int handle_compute_energy_event(void *ctx, void *data, size_t data_sz)
 {
@@ -168,6 +195,7 @@ struct uclamp_test_thermal_pressure_bpf *skel;
  * Define a pthread function handler for each event
  */
 EVENT_THREAD_FN(rq_pelt)
+EVENT_THREAD_FN(select_task_rq_fair)
 EVENT_THREAD_FN(compute_energy)
 
 static inline __attribute__((always_inline)) void do_light_work(void)
@@ -383,6 +411,7 @@ static void *thread_loop(void *data)
 int main(int argc, char **argv)
 {
 	INIT_EVENT_THREAD(rq_pelt);
+	INIT_EVENT_THREAD(select_task_rq_fair);
 	INIT_EVENT_THREAD(compute_energy);
 	pthread_t thread;
 	int ret;
@@ -412,6 +441,7 @@ int main(int argc, char **argv)
 	}
 
 	CREATE_EVENT_THREAD(rq_pelt);
+	CREATE_EVENT_THREAD(select_task_rq_fair);
 	CREATE_EVENT_THREAD(compute_energy);
 
 	/* Wait for events threads to start */
@@ -425,6 +455,7 @@ cleanup:
 	pr_debug("main pid: %u\n", gettid());
 
 	DESTROY_EVENT_THREAD(rq_pelt);
+	DESTROY_EVENT_THREAD(select_task_rq_fair);
 	DESTROY_EVENT_THREAD(compute_energy);
 	uclamp_test_thermal_pressure_bpf__destroy(skel);
 	return ret < 0 ? -ret : EXIT_SUCCESS;

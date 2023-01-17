@@ -15,6 +15,14 @@ struct rq_pelt_event {
 	int overutilized;
 };
 
+struct select_task_rq_fair_event {
+	unsigned long long ts;
+	int cpu;
+	unsigned long p_util_avg;
+	unsigned long uclamp_min;
+	unsigned long uclamp_max;
+};
+
 struct compute_energy_event {
 	unsigned long long ts;
 	int dst_cpu;
