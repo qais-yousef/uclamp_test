@@ -280,6 +280,11 @@ static int test_uclamp_min(void)
 
 	/* Run at capacity boundaries */
 	for_each_capacity(cap, i) {
+		ret = set_uclamp_values(&sched_attr, 0, 1024);
+		if (ret)
+			return ret;
+		do_light_work();
+
 		ret = set_uclamp_values(&sched_attr, cap, 1024);
 		if (ret)
 			return ret;
@@ -288,6 +293,11 @@ static int test_uclamp_min(void)
 
 	/* Run at capacity boundaries + 1 */
 	for_each_capacity(cap, i) {
+		ret = set_uclamp_values(&sched_attr, 0, 1024);
+		if (ret)
+			return ret;
+		do_light_work();
+
 		cap = cap == 1024 ? 1024 : cap + 1;
 		ret = set_uclamp_values(&sched_attr, cap, 1024);
 		if (ret)
