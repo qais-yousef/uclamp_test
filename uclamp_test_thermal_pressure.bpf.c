@@ -10,7 +10,10 @@
 char LICENSE[] SEC("license") = "GPL";
 
 
+/* SCHED defines */
 #define TASK_COMM_LEN	16
+#define ENQUEUE_WAKEUP  0x01
+
 #define PELT_TYPE_LEN	4
 #define RB_SIZE		(256 * 1024)
 
@@ -44,11 +47,20 @@ struct {
 
 
 SEC("kprobe/enqueue_task_fair")
-int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p)
+int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p,
+	       int flags)
 {
 	struct rq_pelt_event *e;
 
+	/* We only cared about enqueues at wake up */
+	if (!(flags & ENQUEUE_WAKEUP))
+		return 0;
+
 	pid_t ppid = BPF_CORE_READ(p, pid);
+
+	if (!pid || pid != ppid)
+		return 0;
+
 	int cpu = BPF_CORE_READ(rq, cpu);
 
 	unsigned long rq_util_avg = BPF_CORE_READ(rq, cfs.avg.util_avg);
@@ -58,9 +70,6 @@ int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p)
 	unsigned long uclamp_min = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MIN].value);
 	unsigned long uclamp_max = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MAX].value);
 	int overutilized = BPF_CORE_READ(rq, rd, overutilized);
-
-	if (!pid || pid != ppid)
-		return 0;
 
 	e = bpf_ringbuf_reserve(&rq_pelt_rb, sizeof(*e), 0);
 	if (e) {
