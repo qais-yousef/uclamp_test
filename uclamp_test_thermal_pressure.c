@@ -300,12 +300,6 @@ static int test_uclamp_min(void)
 
 	fprintf(stdout, "::-- Testing uclamp_min --::\n");
 
-	/* Run first with default values */
-	ret = set_uclamp_values(&sched_attr, 0, 1024);
-	if (ret)
-		return ret;
-	do_light_work();
-
 	/* Run at capacity boundaries */
 	for_each_capacity(cap, i) {
 		ret = set_uclamp_values(&sched_attr, 0, 1024);
