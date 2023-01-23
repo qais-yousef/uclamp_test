@@ -17,8 +17,13 @@ char LICENSE[] SEC("license") = "GPL";
 #define PELT_TYPE_LEN	4
 #define RB_SIZE		(256 * 1024)
 
+/* Global public variables shared with userspace*/
 pid_t pid = 0;
+
+/* Global private variables */
 struct task_struct *task = NULL;
+struct rq *etf_rq = NULL;
+struct task_struct *etf_p = NULL;
 
 
 /* Maps */
@@ -50,8 +55,6 @@ SEC("kprobe/enqueue_task_fair")
 int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p,
 	       int flags)
 {
-	struct rq_pelt_event *e;
-
 	/* We only cared about enqueues at wake up */
 	if (!(flags & ENQUEUE_WAKEUP))
 		return 0;
@@ -60,6 +63,30 @@ int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p,
 
 	if (!pid || pid != ppid)
 		return 0;
+
+	etf_rq = rq;
+	etf_p = p;
+
+	return 0;
+}
+
+SEC("kretprobe/enqueue_task_fair")
+int BPF_KRETPROBE(kretprobe_enqueue_task_fair)
+{
+	struct rq_pelt_event *e;
+	struct rq *rq = etf_rq;
+	struct task_struct *p = etf_p;
+
+	if (!rq || !p)
+		return 0;
+
+	pid_t ppid = BPF_CORE_READ(p, pid);
+
+	if (!pid || pid != ppid)
+		return 0;
+
+	etf_rq = NULL;
+	etf_p = NULL;
 
 	int cpu = BPF_CORE_READ(rq, cpu);
 
@@ -105,18 +132,17 @@ int BPF_KRETPROBE(kretprobe_select_task_rq_fair)
 {
 	int cpu = PT_REGS_RC(ctx);
 	struct select_task_rq_fair_event *e;
-	struct task_struct *p;
+	struct task_struct *p = task;
 
-	if (!task)
+	if (!p)
 		return 0;
-
-	p = task;
-	task = NULL;
 
 	pid_t ppid = BPF_CORE_READ(p, pid);
 
 	if (!pid || pid != ppid)
 		return 0;
+
+	task = NULL;
 
 	unsigned long p_util_avg = BPF_CORE_READ(p, se.avg.util_avg);
 	unsigned long uclamp_min = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MIN].value);
