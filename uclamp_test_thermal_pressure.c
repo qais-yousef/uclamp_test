@@ -155,6 +155,33 @@ static int handle_compute_energy_event(void *ctx, void *data, size_t data_sz)
 	return 0;
 }
 
+#define OVERUTILIZED_CSV_FILE	"uclamp_test_thermal_pressure_overutilized.csv"
+static int handle_overutilized_event(void *ctx, void *data, size_t data_sz)
+{
+	struct overutilized_event *e = data;
+	static FILE *file = NULL;
+	static bool err_once = false;
+
+	if (!file) {
+		file = fopen(OVERUTILIZED_CSV_FILE, "w");
+		if (!file) {
+			if (!err_once) {
+				err_once = true;
+				fprintf(stderr, "Failed to create %s file\n", OVERUTILIZED_CSV_FILE);
+			}
+			return 0;
+		}
+		fprintf(stdout, "Created %s\n", OVERUTILIZED_CSV_FILE);
+		fprintf(file, "ts, overutilized\n");
+	}
+
+	fprintf(file, "%llu, %d\n",
+		e->ts, e->overutilized);
+
+	fflush(file);
+	return 0;
+}
+
 #define SYSFS_CAPACITIES	"/sys/devices/system/cpu/cpu*/cpu_capacity"
 static int get_capacities(void)
 {
@@ -200,6 +227,7 @@ struct uclamp_test_thermal_pressure_bpf *skel;
 EVENT_THREAD_FN(rq_pelt)
 EVENT_THREAD_FN(select_task_rq_fair)
 EVENT_THREAD_FN(compute_energy)
+EVENT_THREAD_FN(overutilized)
 
 static inline __attribute__((always_inline)) void do_light_work(void)
 {
@@ -375,6 +403,13 @@ static int test_uclamp_max(void)
 		do_busy_work();
 	}
 
+	/* Run last with defaults */
+	ret = set_uclamp_values(&sched_attr, 0, 1024);
+	if (ret)
+		return ret;
+	do_light_work();
+	do_busy_work();
+
 	return 0;
 }
 
@@ -410,6 +445,7 @@ int main(int argc, char **argv)
 	INIT_EVENT_THREAD(rq_pelt);
 	INIT_EVENT_THREAD(select_task_rq_fair);
 	INIT_EVENT_THREAD(compute_energy);
+	INIT_EVENT_THREAD(overutilized);
 	pthread_t thread;
 	int ret;
 
@@ -440,6 +476,7 @@ int main(int argc, char **argv)
 	CREATE_EVENT_THREAD(rq_pelt);
 	CREATE_EVENT_THREAD(select_task_rq_fair);
 	CREATE_EVENT_THREAD(compute_energy);
+	CREATE_EVENT_THREAD(overutilized);
 
 	/* Wait for events threads to start */
 	sleep(1);
@@ -454,6 +491,7 @@ cleanup:
 	DESTROY_EVENT_THREAD(rq_pelt);
 	DESTROY_EVENT_THREAD(select_task_rq_fair);
 	DESTROY_EVENT_THREAD(compute_energy);
+	DESTROY_EVENT_THREAD(overutilized);
 	uclamp_test_thermal_pressure_bpf__destroy(skel);
 	return ret < 0 ? -ret : EXIT_SUCCESS;
 }

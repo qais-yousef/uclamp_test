@@ -32,4 +32,9 @@ struct compute_energy_event {
 	unsigned long energy;
 };
 
+struct overutilized_event {
+	unsigned long long ts;
+	int overutilized;
+};
+
 #endif /* __UCLAMP_TEST_THERMAL_PRESSURE_EVENTS_H__ */
