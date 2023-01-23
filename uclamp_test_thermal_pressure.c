@@ -63,7 +63,7 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 			return 0;
 		}
 		fprintf(stdout, "Created %s\n", PELT_CSV_FILE);
-		fprintf(file, "ts, cpu, rq_util, p_util, capacity_orig, thermal_avg, uclamp_min, uclamp_max, overutilized\n");
+		fprintf(file, "ts, cpu, rq_util, p_util, capacity_orig, thermal_avg, uclamp_min, uclamp_max, overutilized, misfit\n");
 	}
 
 	if (e->uclamp_min > e->capacity_orig)
@@ -76,6 +76,9 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 
 	if ((e->uclamp_max > e->capacity_orig || e->uclamp_max == 1024) && e->p_util_avg > e->capacity_orig * 0.8 && e->overutilized != 2)
 		fprintf(stderr, "[%llu] Failed: overutilized flag not set: %lu > %lu\n", e->ts, e->p_util_avg, (unsigned long) (e->capacity_orig * 0.8));
+
+	if (e->uclamp_min > e->capacity_orig - e->thermal_avg && !e->misfit)
+		fprintf(stderr, "[%llu] Failed: misfit flag not set: %lu > %lu\n", e->ts, e->uclamp_min, e->capacity_orig - e->thermal_avg);
 
 	for_each_capacity(cap, i) {
 
@@ -97,8 +100,8 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 	if (e->capacity_orig != smallest_uclamp_max_cap)
 		fprintf(stderr, "[%llu] Failed: uclamp_max not on smallest fitting cap: %lu < %lu\n", e->ts, e->uclamp_max, e->capacity_orig);
 
-	fprintf(file, "%llu, %d, %lu, %lu, %lu, %lu, %lu,%lu, %d\n",
-		e->ts, e->cpu, e->rq_util_avg, e->p_util_avg, e->capacity_orig, e->thermal_avg, e->uclamp_min, e->uclamp_max, e->overutilized);
+	fprintf(file, "%llu, %d, %lu, %lu, %lu, %lu, %lu,%lu, %d, %d\n",
+		e->ts, e->cpu, e->rq_util_avg, e->p_util_avg, e->capacity_orig, e->thermal_avg, e->uclamp_min, e->uclamp_max, e->overutilized, e->misfit);
 
 	fflush(file);
 	return 0;

@@ -97,6 +97,7 @@ int BPF_KRETPROBE(kretprobe_enqueue_task_fair)
 	unsigned long uclamp_min = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MIN].value);
 	unsigned long uclamp_max = BPF_CORE_READ_BITFIELD_PROBED(p, uclamp[UCLAMP_MAX].value);
 	int overutilized = BPF_CORE_READ(rq, rd, overutilized);
+	int misfit = !!BPF_CORE_READ(rq, misfit_task_load);
 
 	e = bpf_ringbuf_reserve(&rq_pelt_rb, sizeof(*e), 0);
 	if (e) {
@@ -109,6 +110,7 @@ int BPF_KRETPROBE(kretprobe_enqueue_task_fair)
 		e->uclamp_min = uclamp_min;
 		e->uclamp_max = uclamp_max;
 		e->overutilized = overutilized;
+		e->misfit = misfit;
 		bpf_ringbuf_submit(e, 0);
 	}
 	return 0;

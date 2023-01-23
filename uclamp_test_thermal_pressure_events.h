@@ -13,6 +13,7 @@ struct rq_pelt_event {
 	unsigned long uclamp_min;
 	unsigned long uclamp_max;
 	int overutilized;
+	int misfit;
 };
 
 struct select_task_rq_fair_event {
