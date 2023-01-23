@@ -50,11 +50,6 @@ struct {
 	__uint(max_entries, RB_SIZE);
 } compute_energy_rb SEC(".maps");
 
-struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, RB_SIZE);
-} overutilized_rb SEC(".maps");
-
 
 SEC("kprobe/enqueue_task_fair")
 int BPF_KPROBE(kprobe_enqueue_task_fair, struct rq *rq, struct task_struct *p,
@@ -162,21 +157,6 @@ int BPF_KRETPROBE(kretprobe_select_task_rq_fair)
 		e->uclamp_max = uclamp_max;
 		bpf_ringbuf_submit(e, 0);
 	}
-	return 0;
-}
-
-SEC("raw_tp/sched_overutilized_tp")
-int BPF_PROG(handle_overutilized_tp, struct root_domain *rd, int overutilized)
-{
-	struct overutilized_event *e;
-
-	e = bpf_ringbuf_reserve(&overutilized_rb, sizeof(*e), 0);
-	if (e) {
-		e->ts = bpf_ktime_get_ns();
-		e->overutilized = overutilized;
-		bpf_ringbuf_submit(e, 0);
-	}
-
 	return 0;
 }
 
