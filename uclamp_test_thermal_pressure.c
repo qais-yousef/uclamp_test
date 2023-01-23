@@ -74,6 +74,9 @@ static int handle_rq_pelt_event(void *ctx, void *data, size_t data_sz)
 			e->ts, e->uclamp_min, e->capacity_orig, e->thermal_avg, capacity_thermal);
 	}
 
+	if ((e->uclamp_max > e->capacity_orig || e->uclamp_max == 1024) && e->p_util_avg > e->capacity_orig * 0.8 && e->overutilized != 2)
+		fprintf(stderr, "[%llu] Failed: overutilized flag not set: %lu > %lu\n", e->ts, e->p_util_avg, (unsigned long) (e->capacity_orig * 0.8));
+
 	for_each_capacity(cap, i) {
 
 		if (e->uclamp_min <= cap && cap < smallest_uclamp_min_cap)
